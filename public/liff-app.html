@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>รายงานความปลอดภัย</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        body { 
+            font-family: sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 20px;
+        }
+        .report-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 20px;
+            font-size: 18px;
+            border-radius: 50px;
+            margin: 20px 0;
+            cursor: pointer;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ รายงานความปลอดภัย</h1>
+        <div id="pointInfo"></div>
+        <button class="report-btn" onclick="submitReport()">
+            📍 กดรายงาน รปภ.ไม่อยู่จุด
+        </button>
+        <p>กดปุ่มด้านบนเพื่อรายงานปัญหา</p>
+    </div>
+
+    <script>
+        let pointId;
+        
+        async function initializeLiff() {
+            await liff.init({ liffId: 'ใส่ LIFF ID ของคุณ' });
+            if (!liff.isLoggedIn()) {
+                liff.login();
+                return;
+            }
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            pointId = urlParams.get('point');
+            document.getElementById('pointInfo').innerHTML = `<h2>📍 จุดที่ ${pointId}</h2>`;
+        }
+        
+        async function submitReport() {
+            try {
+                const profile = await liff.getProfile();
+                const response = await fetch('/api/report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: profile.userId,
+                        displayName: profile.displayName,
+                        pointId: pointId
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('✅ รายงานสำเร็จ!');
+                    liff.closeWindow();
+                }
+            } catch (error) {
+                alert('❌ การรายงานมีปัญหา');
+            }
+        }
+        
+        initializeLiff();
+    </script>
+</body>
+</html>
