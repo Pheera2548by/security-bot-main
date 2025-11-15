@@ -65,12 +65,16 @@ app.post('/webhook', line.middleware(config), (req, res) => {
     // ตอบ LINE ก่อน
     res.sendStatus(200);
 
-    // ค่อยไปทำงาน async ที่หลัง
+    // ประมวลผล event asynchronously แบบไม่ block และไม่ทำให้ Express crash
     const events = req.body.events;
-    events.forEach(async (event) => {
-        await handleEvent(event);
+
+    Promise.all(
+        events.map(event => handleEvent(event))
+    ).catch(err => {
+        console.error("Webhook async error:", err);
     });
 });
+
 
 
 // ฟังก์ชันจัดการ Event
