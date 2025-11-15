@@ -61,21 +61,17 @@ app.post('/api/report', async (req, res) => {
 });
 
 // Webhook สำหรับรับข้อความจาก Line
-app.post('/webhook', line.middleware(config), async (req, res) => {
-    try {
-        console.log('Webhook received:', req.body.events);
-        
-        const events = req.body.events;
-        for (const event of events) {
-            await handleEvent(event);
-        }
-        
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Webhook error:', error);
-        res.status(500).json({ success: false });
-    }
+app.post('/webhook', line.middleware(config), (req, res) => {
+    // ตอบ LINE ก่อน
+    res.sendStatus(200);
+
+    // ค่อยไปทำงาน async ที่หลัง
+    const events = req.body.events;
+    events.forEach(async (event) => {
+        await handleEvent(event);
+    });
 });
+
 
 // ฟังก์ชันจัดการ Event
 async function handleEvent(event) {
@@ -244,7 +240,7 @@ app.get('/', (req, res) => {
 });
 
 // Start Server
-const PORT = "8888"
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log('🚀 Server started on port', PORT);
     console.log('🗃️ Database: Supabase PostgreSQL');
