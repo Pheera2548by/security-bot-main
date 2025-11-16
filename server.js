@@ -2,6 +2,12 @@ require('dotenv').config();
 const express = require('express');
 const line = require('@line/bot-sdk');
 const { Pool } = require('pg');
+import postgres from 'postgres'
+
+const connectionString = process.env.DATABASE_URL
+const sql = postgres(connectionString)
+
+export default sql
 
 // Line Config
 const config = {
