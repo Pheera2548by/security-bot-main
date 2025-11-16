@@ -5,7 +5,7 @@ const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 // ⭐️ END: บังคับให้ Node.js ใช้ IPv4 ก่อนเสมอ
 
-console.log('⚡️ Force redeploy with IPv4 fix (v3)...'); // ⭐️ (v3)
+console.log('⚡️ Deploy (Firewall Fixed)...'); // ⭐️ แก้ไขเป็นข้อความใหม่
 const express = require('express');
 const line = require('@line/bot-sdk');
 const { Pool } = require('pg');
