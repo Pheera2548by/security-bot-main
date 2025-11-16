@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-console.log('⚡️ Deploy (Firewall Fixed)..'); 
+console.log('⚡️ Deploy with NEW VAR...');
 const express = require('express');
 const line = require('@line/bot-sdk');
 const { Pool } = require('pg');
