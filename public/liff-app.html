@@ -6,7 +6,7 @@
     <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
     <style>
         body { 
-            font-family: sans-serif; 
+            font-family: 'Prompt', sans-serif; 
             margin: 0; 
             padding: 20px;
             background: #f5f5f5;
@@ -30,109 +30,233 @@
             font-size: 18px; 
             cursor: pointer;
         }
-        .report-btn:hover { background: #05a944; }
+        .report-btn:disabled { 
+            background: #cccccc; 
+            cursor: not-allowed; 
+        }
+        .report-btn:hover:not(:disabled) { background: #05a944; }
         .status { 
             padding: 15px; 
             margin: 15px 0; 
             border-radius: 5px; 
-            text-align: center;
+            text-align: left;
+            font-size: 14px;
         }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        .loading { background: #fff3cd; color: #856404; }
+        .success { background: #d4edda; color: #155724; border-left: 4px solid #28a745; }
+        .error { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
+        .loading { background: #fff3cd; color: #856404; border-left: 4px solid #ffc107; }
+        .info { background: #d1ecf1; color: #0c5460; border-left: 4px solid #17a2b8; }
+        .debug-info { 
+            background: #f8f9fa; 
+            color: #495057; 
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+        .toggle-debug {
+            background: none;
+            border: none;
+            color: #0066cc;
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 5px 0;
+        }
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🚨 รายงานจุดตรวจสอบ</h1>
-        <div id="pointInfo"></div>
-        <div id="userInfo"></div>
         
-        <button class="report-btn" onclick="submitReport()">
+        <div id="pointInfo" class="status info"></div>
+        <div id="userInfo" class="status info"></div>
+        
+        <button class="report-btn" id="reportBtn" onclick="submitReport()">
             📋 ส่งรายงานจุดนี้
         </button>
         
         <div id="status"></div>
+        
+        <button class="toggle-debug" onclick="toggleDebug()">
+            🐞 แสดง/ซ่อน ข้อมูล Debug
+        </button>
+        
+        <div id="debugInfo" class="debug-info hidden"></div>
     </div>
 
     <script>
         let userId = '';
         let displayName = '';
         let pointId = '';
+        let debugData = [];
+
+        // Add debug log
+        function addDebugLog(message, data = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = {
+                time: timestamp,
+                message: message,
+                data: data
+            };
+            debugData.push(logEntry);
+            updateDebugDisplay();
+            console.log(`[${timestamp}] ${message}`, data);
+        }
+
+        // Update debug display
+        function updateDebugDisplay() {
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.innerHTML = debugData.map(entry => 
+                `<div><strong>[${entry.time}]</strong> ${entry.message}${
+                    entry.data ? `<br>${JSON.stringify(entry.data, null, 2)}` : ''
+                }</div>`
+            ).join('<hr>');
+        }
+
+        // Toggle debug visibility
+        function toggleDebug() {
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.classList.toggle('hidden');
+        }
 
         // Initialize LIFF
         async function initializeLiff() {
+            addDebugLog('🚀 เริ่มต้นโหลด LIFF');
+            
             try {
-                // 🔥 เปลี่ยน LIFF ID เป็นของจริงของคุณ!
+                addDebugLog('🔄 กำลัง initialize LIFF...');
                 await liff.init({ liffId: '2008503069-jNvaAdbw' });
+                addDebugLog('✅ LIFF initialize สำเร็จ');
                 
                 if (!liff.isLoggedIn()) {
+                    addDebugLog('🔐 ผู้ใช้ยังไม่ได้ login, กำลัง redirect...');
                     liff.login();
                     return;
                 }
                 
-                // Get user profile
+                addDebugLog('👤 กำลังดึงข้อมูลผู้ใช้...');
                 const profile = await liff.getProfile();
                 userId = profile.userId;
                 displayName = profile.displayName;
+                addDebugLog('✅ ได้ข้อมูลผู้ใช้แล้ว', { userId, displayName });
                 
                 // Get point ID from URL
                 const urlParams = new URLSearchParams(window.location.search);
                 pointId = urlParams.get('point') || 'A1';
+                addDebugLog('📍 ได้รับ Point ID จาก URL', { pointId });
                 
                 // Display info
                 document.getElementById('pointInfo').innerHTML = 
-                    `<h2>📍 จุดที่ ${pointId}</h2>`;
+                    `<strong>📍 จุดที่ตรวจพบ:</strong> ${pointId}`;
                 document.getElementById('userInfo').innerHTML = 
-                    `<p>👤 คุณ: ${displayName}</p>`;
+                    `<strong>👤 ผู้รายงาน:</strong> ${displayName}`;
                     
+                addDebugLog('🎉 LIFF App พร้อมใช้งาน');
+                
             } catch (error) {
-                console.error('LIFF error:', error);
+                addDebugLog('❌ LIFF Error', error);
                 document.getElementById('status').innerHTML = 
-                    `<div class="status error">❌ เกิดข้อผิดพลาดในการโหลด</div>`;
+                    `<div class="status error">
+                        <strong>❌ เกิดข้อผิดพลาดในการโหลดแอป</strong><br>
+                        <strong>Error:</strong> ${error.message}<br>
+                        <strong>Code:</strong> ${error.code || 'N/A'}<br>
+                        <em>กรุณาปิดแอปแล้วลองใหม่</em>
+                    </div>`;
             }
         }
 
         // Submit report
         async function submitReport() {
+            const reportBtn = document.getElementById('reportBtn');
+            reportBtn.disabled = true;
+            reportBtn.textContent = '⏳ กำลังส่ง...';
+            
+            addDebugLog('📤 เริ่มส่งรายงาน...');
+            
             try {
                 document.getElementById('status').innerHTML = 
-                    '<div class="status loading">⏳ กำลังส่งรายงาน...</div>';
-                
+                    '<div class="status loading"><strong>⏳ กำลังส่งรายงาน...</strong><br>กรุณารอสักครู่</div>';
+
+                const requestData = {
+                    userId: userId,
+                    displayName: displayName,
+                    pointId: pointId
+                };
+
+                addDebugLog('📝 ข้อมูลที่จะส่ง', requestData);
+                addDebugLog('🌐 กำลังเรียก API...', { 
+                    url: '/api/report',
+                    method: 'POST'
+                });
+
+                const startTime = Date.now();
                 const response = await fetch('/api/report', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        userId: userId,
-                        displayName: displayName,
-                        pointId: pointId
-                    })
+                    body: JSON.stringify(requestData)
                 });
-                
+                const responseTime = Date.now() - startTime;
+
+                addDebugLog(`⏱️ ได้รับ response ใน ${responseTime}ms`, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok
+                });
+
                 const result = await response.json();
-                
+                addDebugLog('📨 Response data', result);
+
                 if (result.success) {
+                    addDebugLog('✅ ส่งรายงานสำเร็จ', { reportId: result.reportId });
                     document.getElementById('status').innerHTML = 
                         `<div class="status success">
-                            ✅ ส่งรายงานสำเร็จ!<br>
-                            รหัสรายงาน: #${result.reportId}<br>
-                            คุณจะได้รับแจ้งเตือนเมื่อจัดการเสร็จ
+                            <strong>✅ ส่งรายงานสำเร็จ!</strong><br>
+                            <strong>รหัสรายงาน:</strong> #${result.reportId}<br>
+                            <strong>จุดที่รายงาน:</strong> ${pointId}<br>
+                            <strong>เวลา:</strong> ${new Date().toLocaleTimeString('th-TH')}<br>
+                            <em>คุณจะได้รับแจ้งเตือนเมื่อจัดการเสร็จเรียบร้อย</em>
                         </div>`;
                 } else {
-                    document.getElementById('status').innerHTML = 
-                        `<div class="status error">❌ ${result.error}</div>`;
+                    addDebugLog('❌ API returned error', result);
+                    let errorHtml = `<div class="status error">
+                        <strong>❌ การส่งรายงานล้มเหลว</strong><br>`;
+                    
+                    if (result.error) errorHtml += `<strong>Error:</strong> ${result.error}<br>`;
+                    if (result.details) errorHtml += `<strong>Details:</strong> ${result.details}<br>`;
+                    if (result.message) errorHtml += `<strong>Message:</strong> ${result.message}<br>`;
+                    
+                    errorHtml += `<em>กรุณาลองใหม่อีกครั้งหรือติดต่อผู้ดูแลระบบ</em></div>`;
+                    
+                    document.getElementById('status').innerHTML = errorHtml;
                 }
                 
             } catch (error) {
-                console.error('Report error:', error);
+                addDebugLog('💥 Fetch error', error);
                 document.getElementById('status').innerHTML = 
-                    `<div class="status error">❌ การส่งรายงานล้มเหลว</div>`;
+                    `<div class="status error">
+                        <strong>❌ การเชื่อมต่อล้มเหลว</strong><br>
+                        <strong>Error:</strong> ${error.message}<br>
+                        <strong>Type:</strong> ${error.name}<br>
+                        <em>กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตและลองใหม่</em>
+                    </div>`;
+            } finally {
+                reportBtn.disabled = false;
+                reportBtn.textContent = '📋 ส่งรายงานจุดนี้';
+                addDebugLog('🔄 ปุ่มรายงานพร้อมใช้งานอีกครั้ง');
             }
         }
 
         // Start the app when page loads
+        addDebugLog('📄 หน้าเว็บโหลดเรียบร้อย, เริ่มต้น LIFF...');
         initializeLiff();
     </script>
 </body>

@@ -39,37 +39,51 @@ app.get('/liff-app.html', (req, res) => {
 
 // API สำหรับรับรายงานจาก LIFF
 app.post('/api/report', async (req, res) => {
+    console.log('📝 API Report - Request received:', req.body);
+    
     try {
-        console.log('📝 Received report:', req.body);
-        
         const { userId, displayName, pointId } = req.body;
+        
+        console.log('📝 Extracted data:', { userId, displayName, pointId });
         
         // Validate required fields
         if (!userId || !displayName || !pointId) {
+            console.log('❌ Missing fields:', { userId, displayName, pointId });
             return res.status(400).json({ 
                 success: false, 
                 error: 'Missing required fields' 
             });
         }
         
+        // Test database connection
+        console.log('🔌 Testing database connection...');
+        const testResult = await pool.query('SELECT NOW() as time');
+        console.log('✅ Database connected:', testResult.rows[0].time);
+        
         // บันทึกลง Supabase
+        console.log('💾 Inserting into database...');
         const result = await pool.query(
             'INSERT INTO security_reports (user_id, display_name, point_id, status) VALUES ($1, $2, $3, $4) RETURNING id',
             [userId, displayName, pointId, 'pending']
         );
         
         const reportId = result.rows[0].id;
+        console.log('✅ Report saved with ID:', reportId);
         
-        // ส่งแจ้งเตือนไปยัง Admin
+        // ส่งแจ้งเตือนไปยัง Admin (ถ้ามี)
         if (process.env.ADMIN_USER_ID) {
             try {
+                console.log('📤 Sending push message to admin...');
                 await client.pushMessage(process.env.ADMIN_USER_ID, {
                     type: 'text',
                     text: `🚨 รายงานใหม่!\n👤 คุณ${displayName}\n📍 จุดที่ ${pointId}\n📝 รหัส: #${reportId}\n\nพิมพ์ "เรียบร้อย" เพื่อแจ้งลูกค้า`
                 });
+                console.log('✅ Push message sent');
             } catch (pushError) {
-                console.error('📤 Push message error:', pushError);
+                console.error('❌ Push message error:', pushError);
             }
+        } else {
+            console.log('⚠️ ADMIN_USER_ID not set, skipping push message');
         }
         
         res.json({ 
@@ -80,7 +94,11 @@ app.post('/api/report', async (req, res) => {
         
     } catch (error) {
         console.error('❌ Report error:', error);
-        res.status(500).json({ success: false, error: 'Internal server error' });
+        res.status(500).json({ 
+            success: false, 
+            error: 'Internal server error',
+            details: error.message 
+        });
     }
 });
 
