@@ -142,10 +142,40 @@
                 }
                 
                 addDebugLog('👤 กำลังดึงข้อมูลผู้ใช้...');
-                const profile = await liff.getProfile();
-                userId = profile.userId;
-                displayName = profile.displayName;
-                addDebugLog('✅ ได้ข้อมูลผู้ใช้แล้ว', { userId, displayName });
+                
+                // ลองดึง profile ก่อน
+                try {
+                    const profile = await liff.getProfile();
+                    userId = profile.userId;
+                    displayName = profile.displayName;
+                    addDebugLog('✅ ได้ข้อมูลจาก getProfile', { 
+                        userId: userId, 
+                        displayName: displayName 
+                    });
+                } catch (profileError) {
+                    addDebugLog('⚠️ ไม่สามารถดึง Profile ได้, ใช้ Context แทน', profileError);
+                    
+                    // ใช้ context แทน
+                    const context = await liff.getContext();
+                    userId = context.userId;
+                    displayName = 'ผู้ใช้ LINE';
+                    
+                    addDebugLog('✅ ใช้ข้อมูลจาก Context', { 
+                        userId: userId, 
+                        displayName: displayName 
+                    });
+                }
+                
+                // ตรวจสอบว่ามี userId
+                if (!userId) {
+                    addDebugLog('❌ ERROR: ไม่มี User ID');
+                    document.getElementById('status').innerHTML = 
+                        `<div class="status error">
+                            <strong>❌ ไม่สามารถระบุตัวตนผู้ใช้ได้</strong><br>
+                            <em>กรุณาปิดแอปแล้วลองใหม่</em>
+                        </div>`;
+                    return;
+                }
                 
                 // Get point ID from URL
                 const urlParams = new URLSearchParams(window.location.search);
@@ -156,8 +186,9 @@
                 document.getElementById('pointInfo').innerHTML = 
                     `<strong>📍 จุดที่ตรวจพบ:</strong> ${pointId}`;
                 document.getElementById('userInfo').innerHTML = 
-                    `<strong>👤 ผู้รายงาน:</strong> ${displayName}`;
-                    
+                    `<strong>👤 ผู้รายงาน:</strong> ${displayName}<br>
+                     <strong>🆔 User ID:</strong> ${userId ? userId.substring(0, 10) + '...' : 'ไม่พบ'}`;
+                
                 addDebugLog('🎉 LIFF App พร้อมใช้งาน');
                 
             } catch (error) {
@@ -166,7 +197,6 @@
                     `<div class="status error">
                         <strong>❌ เกิดข้อผิดพลาดในการโหลดแอป</strong><br>
                         <strong>Error:</strong> ${error.message}<br>
-                        <strong>Code:</strong> ${error.code || 'N/A'}<br>
                         <em>กรุณาปิดแอปแล้วลองใหม่</em>
                     </div>`;
             }
@@ -191,10 +221,6 @@
                 };
 
                 addDebugLog('📝 ข้อมูลที่จะส่ง', requestData);
-                addDebugLog('🌐 กำลังเรียก API...', { 
-                    url: '/api/report',
-                    method: 'POST'
-                });
 
                 const startTime = Date.now();
                 const response = await fetch('/api/report', {
@@ -232,7 +258,6 @@
                     
                     if (result.error) errorHtml += `<strong>Error:</strong> ${result.error}<br>`;
                     if (result.details) errorHtml += `<strong>Details:</strong> ${result.details}<br>`;
-                    if (result.message) errorHtml += `<strong>Message:</strong> ${result.message}<br>`;
                     
                     errorHtml += `<em>กรุณาลองใหม่อีกครั้งหรือติดต่อผู้ดูแลระบบ</em></div>`;
                     
@@ -245,13 +270,11 @@
                     `<div class="status error">
                         <strong>❌ การเชื่อมต่อล้มเหลว</strong><br>
                         <strong>Error:</strong> ${error.message}<br>
-                        <strong>Type:</strong> ${error.name}<br>
                         <em>กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตและลองใหม่</em>
                     </div>`;
             } finally {
                 reportBtn.disabled = false;
                 reportBtn.textContent = '📋 ส่งรายงานจุดนี้';
-                addDebugLog('🔄 ปุ่มรายงานพร้อมใช้งานอีกครั้ง');
             }
         }
 
