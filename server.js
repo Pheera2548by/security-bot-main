@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const line = require('@line/bot-sdk');
-const { Pool } = require('pg');
 
 // Line Config
 const config = {
@@ -10,12 +9,6 @@ const config = {
 };
 const client = new line.Client(config);
 
-// Database Connection
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-});
-
 const app = express();
 
 // Middleware
@@ -23,16 +16,26 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Webhook สำหรับรับข้อความจาก Line
+// Webhook สำหรับรับข้อความจาก Line - SIMPLE VERSION
 app.post('/webhook', line.middleware(config), (req, res) => {
+    console.log('✅ Webhook received, sending 200 response');
+    
+    // ตอบ 200 ทันที
     res.status(200).json({ status: 'OK' });
     
-    const events = req.body.events || [];
-    events.forEach(event => {
-        handleEvent(event).catch(err => {
-            console.error('Event error:', err);
+    // Process events แบบ async
+    try {
+        const events = req.body.events || [];
+        console.log(`📋 Processing ${events.length} events`);
+        
+        events.forEach(event => {
+            handleEvent(event).catch(err => {
+                console.error('Event error:', err);
+            });
         });
-    });
+    } catch (error) {
+        console.error('Webhook processing error:', error);
+    }
 });
 
 // API สำหรับรับรายงานจาก LIFF
@@ -49,7 +52,7 @@ app.post('/api/report', async (req, res) => {
             });
         }
         
-        // ใช้ mock data ชั่วคราว (ลบบรรทัดนี้เมื่อ database ทำงานได้)
+        // ใช้ mock data ชั่วคราว
         const reportId = Math.floor(1000 + Math.random() * 9000);
         console.log('✅ Report saved (mock):', reportId);
         
@@ -83,13 +86,22 @@ app.post('/api/report', async (req, res) => {
 // ฟังก์ชันจัดการ Event
 async function handleEvent(event) {
     try {
+        console.log('🔹 Handling event:', event.type);
+        
         if (event.type === 'message' && event.message.type === 'text') {
             const messageText = event.message.text.trim().toLowerCase();
             
-            if (messageText === 'รายงาน') {
+            if (messageText === 'รายงาน' || messageText === 'status') {
                 await client.replyMessage(event.replyToken, {
                     type: 'text',
-                    text: '📊 ระบบรายงานความปลอดภัย\n\nใช้ "เรียบร้อย" เพื่อยืนยันการแก้ไข'
+                    text: '📊 ระบบรายงานความปลอดภัย\n\nใช้ "เรียบร้อย" เพื่อยืนยันการแก้ไขรายงาน'
+                });
+            }
+            
+            if (messageText.includes('เรียบร้อย')) {
+                await client.replyMessage(event.replyToken, {
+                    type: 'text',
+                    text: '✅ ยืนยันการแก้ไขเรียบร้อยแล้ว'
                 });
             }
         }
@@ -97,11 +109,12 @@ async function handleEvent(event) {
         if (event.type === 'follow') {
             await client.replyMessage(event.replyToken, {
                 type: 'text',
-                text: '👋 สวัสดี! บอทรายงานความปลอดภัย'
+                text: '👋 สวัสดี! บอทรายงานความปลอดภัย\n\nพิมพ์ "รายงาน" เพื่อดูสถานะ'
             });
         }
+        
     } catch (error) {
-        console.error('Handle event error:', error);
+        console.error('❌ Handle event error:', error);
     }
 }
 
@@ -109,7 +122,17 @@ async function handleEvent(event) {
 app.get('/', (req, res) => {
     res.json({ 
         status: 'OK', 
-        message: 'Security Report Bot is running'
+        message: 'Security Report Bot is running',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Test Webhook
+app.get('/test-webhook', (req, res) => {
+    res.json({ 
+        message: 'Webhook endpoint is working',
+        url: '/webhook',
+        method: 'POST'
     });
 });
 
@@ -117,4 +140,5 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log('🚀 Server started on port', PORT);
+    console.log('✅ Webhook URL: https://security-bot-main-production.up.railway.app/webhook');
 });
