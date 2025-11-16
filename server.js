@@ -1,11 +1,8 @@
+// server.js - แก้ไขเฉพาะ connection
 require('dotenv').config();
-import postgres from 'postgres'
 const express = require('express');
 const line = require('@line/bot-sdk');
 const { Pool } = require('pg');
-const connectionString = process.env.DATABASE_URL
-const sql = postgres(connectionString)
-export default sql
 
 // Line Config
 const config = {
@@ -14,11 +11,19 @@ const config = {
 };
 const client = new line.Client(config);
 
-// Supabase PostgreSQL Connection
+// Supabase Connection (แบบเดิมแต่ตรวจสอบ DATABASE_URL)
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+    ssl: { 
+        rejectUnauthorized: false 
+    },
+    // เพิ่ม options เพื่อความเสถียร
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30000,
+    max: 20
 });
+
+// ... ใช้ pool.query แบบเดิม ไม่ต้องแก้ไขโค้ดอื่น
 
 const app = express();
 
