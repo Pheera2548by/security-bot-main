@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-console.log('⚡️ Deploy (Firewall Fixed)...'); // ⭐️ แก้ไขเป็นข้อความใหม่
+console.log('⚡️ Deploy (Firewall Fixed)..'); 
 const express = require('express');
 const line = require('@line/bot-sdk');
 const { Pool } = require('pg');
