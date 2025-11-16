@@ -1,18 +1,9 @@
 require('dotenv').config();
 
-// ⭐️ START: บังคับให้ Node.js ใช้ IPv4 ก่อนเสมอ
-const dns = require('dns');
-dns.setDefaultResultOrder('ipv4first');
-// ⭐️ END: บังคับให้ Node.js ใช้ IPv4 ก่อนเสมอ
-
 console.log('⚡️ Deploy (Firewall Fixed)...'); // ⭐️ แก้ไขเป็นข้อความใหม่
 const express = require('express');
 const line = require('@line/bot-sdk');
 const { Pool } = require('pg');
-const { parse } = require('pg-connection-string'); // ⭐️ 1. Import ตัวช่วยแยกส่วน
-
-// ⭐️ 2. แยกส่วน DATABASE_URL ออกมาเป็น config object
-const dbConfig = parse(process.env.DATABASE_URL);
 
 // Line Config
 const config = {
@@ -24,8 +15,7 @@ const client = new line.Client(config);
 
 // ⭐️ 3. ตั้งค่าการเชื่อมต่อ Supabase (PostgreSQL)
 const pool = new Pool({
-    ...dbConfig, // ⭐️ เอา config ที่แยกส่วนมาใช้
-    family: 4     // ⭐️ เพิ่ม family: 4 เข้าไปตรงๆ
+    connectionString: process.env.DATABASE_URL,
 });
 
 // ⭐️ 4. ทดสอบการเชื่อมต่อ Database
