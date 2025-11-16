@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node --dns-result-order=ipv4first server.js"
   },
   "dependencies": {
     "@line/bot-sdk": "^7.5.0",
