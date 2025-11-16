@@ -75,11 +75,11 @@
     <div class="container">
         <h1>🚨 รายงานจุดตรวจสอบ</h1>
         
-        <div id="pointInfo" class="status info"></div>
-        <div id="userInfo" class="status info"></div>
+        <div id="pointInfo" class="status info">⏳ กำลังโหลดจุดตรวจสอบ...</div>
+        <div id="userInfo" class="status info">⏳ กำลังระบุตัวตน...</div>
         
-        <button class="report-btn" id="reportBtn" onclick="submitReport()">
-            📋 ส่งรายงานจุดนี้
+        <button class="report-btn" id="reportBtn" onclick="submitReport()" disabled>
+            ⏳ กำลังโหลด...
         </button>
         
         <div id="status"></div>
@@ -95,6 +95,7 @@
         let userId = '';
         let displayName = '';
         let pointId = '';
+        let isAppReady = false;
         let debugData = [];
 
         // Add debug log
@@ -186,8 +187,12 @@
                 document.getElementById('pointInfo').innerHTML = 
                     `<strong>📍 จุดที่ตรวจพบ:</strong> ${pointId}`;
                 document.getElementById('userInfo').innerHTML = 
-                    `<strong>👤 ผู้รายงาน:</strong> ${displayName}<br>
-                     <strong>🆔 User ID:</strong> ${userId ? userId.substring(0, 10) + '...' : 'ไม่พบ'}`;
+                    `<strong>👤 ผู้รายงาน:</strong> ${displayName}`;
+                
+                // เปิดให้กดปุ่มได้
+                isAppReady = true;
+                document.getElementById('reportBtn').disabled = false;
+                document.getElementById('reportBtn').textContent = '📋 ส่งรายงานจุดนี้';
                 
                 addDebugLog('🎉 LIFF App พร้อมใช้งาน');
                 
@@ -204,6 +209,22 @@
 
         // Submit report
         async function submitReport() {
+            // ตรวจสอบว่าพร้อมหรือยัง
+            if (!isAppReady) {
+                addDebugLog('⚠️ App ยังไม่พร้อม, ไม่สามารถส่งรายงานได้');
+                document.getElementById('status').innerHTML = 
+                    '<div class="status error">⏳ กำลังโหลดข้อมูล... กรุณารอสักครู่</div>';
+                return;
+            }
+            
+            // ตรวจสอบว่ามีข้อมูลครบ
+            if (!userId || !displayName || !pointId) {
+                addDebugLog('❌ ข้อมูลไม่ครบ', { userId, displayName, pointId });
+                document.getElementById('status').innerHTML = 
+                    '<div class="status error">❌ ข้อมูลไม่ครบถ้วน กรุณาลองใหม่</div>';
+                return;
+            }
+
             const reportBtn = document.getElementById('reportBtn');
             reportBtn.disabled = true;
             reportBtn.textContent = '⏳ กำลังส่ง...';
