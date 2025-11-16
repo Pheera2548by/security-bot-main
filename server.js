@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-console.log('⚡️ DEPLOY WITH NO VAR...');
+console.log('⚡️ DEPLOY...');
 const express = require('express');
 const line = require('@line/bot-sdk');
 const { Pool } = require('pg');
