@@ -1,4 +1,6 @@
 require('dotenv').config();
+console.log('⚡️ Force redeploy with IPv4 fix...');
+
 const express = require('express');
 const line = require('@line/bot-sdk');
 const { Pool } = require('pg'); // ⭐️ เพิ่ม pg
