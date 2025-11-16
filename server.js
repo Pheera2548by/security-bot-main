@@ -1,9 +1,13 @@
 require('dotenv').config();
-console.log('⚡️ Force redeploy with IPv4 fix...');
+console.log('⚡️ Force redeploy with IPv4 fix (v2)...'); // ⭐️ (v2)
 
 const express = require('express');
 const line = require('@line/bot-sdk');
-const { Pool } = require('pg'); // ⭐️ เพิ่ม pg
+const { Pool } = require('pg');
+const { parse } = require('pg-connection-string'); // ⭐️ 1. Import ตัวช่วยแยกส่วน
+
+// ⭐️ 2. แยกส่วน DATABASE_URL ออกมาเป็น config object
+const dbConfig = parse(process.env.DATABASE_URL);
 
 // Line Config
 const config = {
@@ -13,21 +17,20 @@ const config = {
 
 const client = new line.Client(config);
 
-// ⭐️ ตั้งค่าการเชื่อมต่อ Supabase (PostgreSQL)
+// ⭐️ 3. ตั้งค่าการเชื่อมต่อ Supabase (PostgreSQL)
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    family: 4
+    ...dbConfig, // ⭐️ เอา config ที่แยกส่วนมาใช้
+    family: 4     // ⭐️ เพิ่ม family: 4 เข้าไปตรงๆ
 });
 
-// ⭐️ ทดสอบการเชื่อมต่อ Database
+// ⭐️ 4. ทดสอบการเชื่อมต่อ Database
 pool.query('SELECT NOW()', (err, res) => {
-  if (err) {
-    console.error('❌ Database connection error:', err.stack);
-  } else {
-    console.log('✅ Database connected:', res.rows[0].now);
-  }
+    if (err) {
+        console.error('❌ Database connection error:', err.stack);
+    } else {
+        console.log('✅ Database connected:', res.rows[0].now);
+    }
 });
-
 
 const app = express();
 
