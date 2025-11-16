@@ -14,6 +14,7 @@ const client = new line.Client(config);
 // ⭐️ ตั้งค่าการเชื่อมต่อ Supabase (PostgreSQL)
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
+    family: 4
 });
 
 // ⭐️ ทดสอบการเชื่อมต่อ Database
