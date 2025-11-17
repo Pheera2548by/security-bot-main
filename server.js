@@ -1,6 +1,6 @@
 require('dotenv').config();
+console.log('⚡️ SERVER STARTING (With Retry Logic)...');
 
-console.log('⚡️ DEPLOY...');
 const express = require('express');
 const line = require('@line/bot-sdk');
 const { Pool } = require('pg');
@@ -13,12 +13,12 @@ const config = {
 
 const client = new line.Client(config);
 
-// ⭐️ 3. ตั้งค่าการเชื่อมต่อ Supabase (PostgreSQL)
+// ⭐️ ตั้งค่าการเชื่อมต่อ Supabase (PostgreSQL)
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
-// ⭐️ 4. ทดสอบการเชื่อมต่อ Database
+// ⭐️ ทดสอบการเชื่อมต่อ Database
 pool.query('SELECT NOW()', (err, res) => {
     if (err) {
         console.error('❌ Database connection error:', err.stack);
@@ -32,207 +32,185 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public')); // ⭐️ สำหรับ liff-app.html
+app.use(express.static('public'));
 
-// Webhook สำหรับรับข้อความจาก Line
+// ---------------------------------------------------------
+// 🛠️ Helper Functions: ฟังก์ชันช่วยส่งข้อความแบบพิเศษ
+// ---------------------------------------------------------
+
+// ฟังก์ชันหน่วงเวลา (Sleep)
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// ฟังก์ชันส่งข้อความแบบ "ตื๊อ" (Retry) และเช็คสถานะเพื่อน
+async function sendPushMessageWithRetry(userId, messages, maxRetries = 1) {
+    for (let i = 0; i <= maxRetries; i++) {
+        try {
+            // 1. ลองเช็คสถานะเพื่อนก่อน (ถ้าดึง Profile ไม่ได้ = บล็อก หรือ ยังไม่เพิ่มเพื่อน)
+            try {
+                await client.getProfile(userId);
+            } catch (profileError) {
+                console.warn(`⚠️ Attempt ${i+1}: Cannot get profile for ${userId}. User might not be a friend.`);
+                // ไม่ throw error ตรงนี้ เผื่อฟลุ๊คส่งได้ ให้ไปลองส่งเลย
+            }
+
+            // 2. พยายามส่งข้อความ
+            await client.pushMessage(userId, messages);
+            console.log(`✅ Sent message to ${userId} success!`);
+            return true; // ส่งสำเร็จ ออกจากฟังก์ชันทันที
+
+        } catch (error) {
+            console.error(`❌ Send attempt ${i + 1} failed: ${error.message}`);
+            
+            // ถ้ายังไม่ครบจำนวนครั้ง ให้รอและลองใหม่
+            if (i < maxRetries) {
+                console.log('⏳ Waiting 2 seconds before retry...');
+                await delay(2000); // รอ 2 วินาที
+            } else {
+                // ถ้าครบกำหนดแล้วยังไม่ได้ ให้โยน Error ออกไป
+                console.error('❌ All retry attempts failed.');
+                throw error; 
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------
+// 🔗 Webhook & Event Handling
+// ---------------------------------------------------------
+
 app.post('/webhook', (req, res) => {
     console.log('✅ Webhook received');
-    // ตอบกลับ LINE ทันทีว่าได้รับแล้ว (สำคัญมาก)
     res.status(200).send('OK'); 
     
     try {
         const events = req.body.events || [];
-        console.log(`📋 Processing ${events.length} events`);
-        
-        // ⭐️ ใช้ Promise.all เพื่อจัดการ event พร้อมกันและจับ error
         Promise.all(events.map(handleEvent))
-            .catch(err => {
-                console.error('Event processing error:', err);
-            });
-            
+            .catch(err => console.error('Event processing error:', err));     
     } catch (error) {
         console.error('Webhook payload error:', error);
     }
 });
 
-// ฟังก์ชันจัดการ Event
 async function handleEvent(event) {
     try {
-        // ⭐️ ไม่จัดการ event ถ้าไม่ใช่ text หรือ follow
-        if (event.type !== 'message' && event.type !== 'follow') {
-            return null;
-        }
+        if (event.type !== 'message' && event.type !== 'follow') return null;
 
-        console.log('🔹 Handling event type:', event.type, 'Source:', event.source.userId);
-
-        // ⭐️ เมื่อมีคนเพิ่มเพื่อน
+        // ⭐️ เมื่อมีคนเพิ่มเพื่อน (Greeting)
         if (event.type === 'follow') {
             return client.replyMessage(event.replyToken, {
                 type: 'text',
-                text: `👋 สวัสดี! บอทรายงานความปลอดภัย\n\n💡 วิธีการใช้งาน:\n• สแกน QR Code ตามจุด\n• กดรายงานปัญหา\n• รอการแจ้งเตือนเมื่อจัดการเสร็จ\n\nสำหรับ Admin:\nพิมพ์ "รายงาน" เพื่อดูสถานะ\nพิมพ์ "help" เพื่อดูคำสั่งทั้งหมด`
+                text: `👋 สวัสดีครับ! บอทรายงานความปลอดภัย\n\nเมื่อท่านสแกน QR Code เพื่อรายงาน\nระบบจะส่งแจ้งเตือนความคืบหน้าผ่านทางนี้ครับ`
             });
         }
 
-        // ⭐️ จัดการเฉพาะข้อความที่เป็น text
         if (event.type === 'message' && event.message.type === 'text') {
-            const messageText = event.message.text.trim().toLowerCase();
+            const messageText = event.message.text.trim();
             const adminUserId = process.env.ADMIN_USER_ID;
 
-            // ⭐️ ตรวจสอบว่าเป็น Admin หรือไม่ (ถ้ามีการตั้งค่าไว้)
-            // ถ้าไม่ใช Admin จะตอบกลับเฉพาะ "help"
+            // ตรวจสอบ Admin (ถ้ามี)
             if (adminUserId && event.source.userId !== adminUserId) {
-                if (messageText === 'help' || messageText === 'ช่วยเหลือ') {
-                     return client.replyMessage(event.replyToken, {
-                        type: 'text',
-                        text: '💡 วิธีการใช้งาน:\n\n• สแกน QR Code ตามจุด\n• กดรายงานปัญหา\n• รอการแจ้งเตือนเมื่อจัดการเสร็จ'
-                    });
+                if (messageText.toLowerCase() === 'help') {
+                     return client.replyMessage(event.replyToken, { type: 'text', text: 'สำหรับเจ้าหน้าที่เท่านั้นครับ' });
                 }
-                return null; // ไม่ใช่ Admin และไม่ใช่คำสั่ง help
+                return null;
             }
 
-            // ⭐️ ถ้ามีคำว่า "เรียบร้อย" (สำหรับ Admin)
+            // ⭐️ คำสั่ง: "เรียบร้อย #..." (ปิดงาน)
             if (messageText.includes('เรียบร้อย')) {
                 let reportId;
-                
-                // หา reportId จากข้อความ (เช่น #1234)
                 const idMatch = messageText.match(/#(\d+)/);
+                
                 if (idMatch) {
                     reportId = parseInt(idMatch[1]);
                 } else {
-                    // ⭐️ หารายงานล่าสุดที่ยังไม่เสร็จ จาก DB
-                    const latestQuery = `
-                        SELECT report_id FROM reports 
-                        WHERE status = 'pending' 
-                        ORDER BY created_at DESC 
-                        LIMIT 1
-                    `;
+                    // หาอันล่าสุดที่ยัง Pending
+                    const latestQuery = `SELECT report_id FROM reports WHERE status = 'pending' ORDER BY created_at DESC LIMIT 1`;
                     const latestResult = await pool.query(latestQuery);
-                    if (latestResult.rows.length > 0) {
-                        reportId = latestResult.rows[0].report_id;
-                    }
+                    if (latestResult.rows.length > 0) reportId = latestResult.rows[0].report_id;
                 }
                 
                 if (reportId) {
-                    // ⭐️ 1. ดึงข้อมูลรายงานจาก DB
                     const selectQuery = "SELECT * FROM reports WHERE report_id = $1 AND status = 'pending'";
                     const selectResult = await pool.query(selectQuery, [reportId]);
                     
                     if (selectResult.rows.length > 0) {
                         const report = selectResult.rows[0];
                         
+                        // อัพเดท DB ก่อน
+                        const updateQuery = `UPDATE reports SET status = 'completed', completed_at = NOW() WHERE report_id = $1`;
+                        await pool.query(updateQuery, [reportId]);
+
+                        // ตอบกลับ Admin
+                        await client.replyMessage(event.replyToken, {
+                            type: 'text',
+                            text: `✅ แจ้งย้อนกลับให้คุณ${report.display_name} เรียบร้อยแล้ว!\n📍 จุดที่ ${report.point_id}\n📝 รหัสรายงาน: #${reportId}`
+                        });
+
+                        // ⭐️ ส่งข้อความหาลูกค้า (ใช้ระบบ Retry ใหม่!)
                         try {
-                            // ⭐️ 2. ส่งข้อความย้อนกลับให้ลูกค้า
-                            await client.pushMessage(report.user_id, {
+                            await sendPushMessageWithRetry(report.user_id, {
                                 type: 'text',
                                 text: `✅ การรายงานจุดที่ ${report.point_id} จัดการเรียบร้อยแล้ว!\n\nขอบคุณที่แจ้งปัญหาให้ทราบ 🙏`
                             });
-                            console.log('✅ Sent confirmation to customer:', report.user_id);
-                            
-                            // ⭐️ 3. อัพเดทสถานะรายงานใน DB
-                            const updateQuery = `
-                                UPDATE reports 
-                                SET status = 'completed', completed_at = NOW() 
-                                WHERE report_id = $1
-                            `;
-                            await pool.query(updateQuery, [reportId]);
-                            
-                            // ⭐️ 4. ตอบกลับ Admin
-                            return client.replyMessage(event.replyToken, {
-                                type: 'text',
-                                text: `✅ แจ้งย้อนกลับให้คุณ${report.display_name} เรียบร้อยแล้ว!\n📍 จุดที่ ${report.point_id}\n📝 รหัสรายงาน: #${reportId}`
-                            });
-                            
                         } catch (customerError) {
-                            console.error('❌ Error sending to customer:', customerError);
-                            return client.replyMessage(event.replyToken, {
-                                type: 'text',
-                                text: `❌ ไม่สามารถแจ้งลูกค้าได้ (UserID: ${report.user_id})`
-                            });
+                            // ถ้าส่งหาลูกค้าไม่ได้ ให้แจ้งเตือน Admin เพิ่ม
+                            console.error('❌ Failed to notify customer:', customerError.message);
+                            if (adminUserId) {
+                                await client.pushMessage(adminUserId, {
+                                    type: 'text',
+                                    text: `⚠️ แจ้งเตือน: ส่งข้อความหาลูกค้าไม่ได้ (งาน #${reportId})\nสาเหตุ: ลูกค้าอาจบล็อกบอท หรือยังไม่เพิ่มเพื่อน`
+                                });
+                            }
                         }
+
                     } else {
-                        return client.replyMessage(event.replyToken, {
-                            type: 'text',
-                            text: '❌ ไม่พบรายงานที่ต้องการยืนยัน (อาจจะยืนยันไปแล้ว หรือใส่รหัสผิด)'
-                        });
+                        return client.replyMessage(event.replyToken, { type: 'text', text: '❌ ไม่พบรายงานที่ต้องการยืนยัน หรือปิดงานไปแล้ว' });
                     }
                 } else {
-                    return client.replyMessage(event.replyToken, {
-                        type: 'text',
-                        text: '❌ ไม่พบรายงานที่ค้างอยู่\n\nตัวอย่าง:\n"เรียบร้อย #1234"\nหรือ "เรียบร้อย" (สำหรับรายงานล่าสุด)'
-                    });
+                    return client.replyMessage(event.replyToken, { type: 'text', text: '❌ ไม่พบรายงานที่ค้างอยู่' });
                 }
             }
             
-            // ⭐️ คำสั่งตรวจสอบสถานะ (สำหรับ Admin)
+            // ⭐️ คำสั่ง: รายงาน/status
             if (messageText === 'รายงาน' || messageText === 'status') {
-                // ⭐️ ใช้ SQL COUNT เพื่อดึงข้อมูล
-                const countQuery = `
-                    SELECT
-                        COUNT(*) AS total,
-                        COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending,
-                        COUNT(CASE WHEN status = 'completed' THEN 1 END) AS completed
-                    FROM reports
-                `;
+                const countQuery = `SELECT COUNT(*) AS total, COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending FROM reports`;
                 const countResult = await pool.query(countQuery);
                 const counts = countResult.rows[0];
-
-                let statusText = `📊 สถานะรายงาน\n\n`;
-                statusText += `📈 ทั้งหมด: ${counts.total} รายงาน\n`;
-                statusText += `⏳ รอแก้ไข: ${counts.pending} รายงาน\n`;
-                statusText += `✅ เสร็จสิ้น: ${counts.completed} รายงาน\n\n`;
-
-                // ⭐️ ดึง 5 รายงานล่าสุดจาก DB
-                const recentQuery = `
-                    SELECT report_id, point_id, display_name, status, created_at 
-                    FROM reports 
-                    ORDER BY created_at DESC 
-                    LIMIT 5
-                `;
+                
+                // ดึง 5 รายงานล่าสุด
+                const recentQuery = `SELECT report_id, point_id, display_name, status, created_at FROM reports ORDER BY created_at DESC LIMIT 5`;
                 const recentResult = await pool.query(recentQuery);
 
+                let statusText = `📊 สถานะรายงาน\n⏳ รอแก้ไข: ${counts.pending}\n📈 ทั้งหมด: ${counts.total}\n\n📋 ล่าสุด:\n`;
+                
                 if (recentResult.rows.length > 0) {
-                    statusText += `📋 รายงานล่าสุด:\n`;
                     recentResult.rows.forEach(report => {
-                        const statusIcon = report.status === 'pending' ? '🟡' : '✅';
-                        const time = new Date(report.created_at).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok' });
-                        statusText += `${statusIcon} #${report.report_id} จุด ${report.point_id} (${time})\n`;
+                        const icon = report.status === 'pending' ? '🟡' : '✅';
+                        const time = new Date(report.created_at).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute:'2-digit' });
+                        statusText += `${icon} #${report.report_id} ${report.point_id} (${time})\n`;
                     });
                 }
                 
-                statusText += `\nใช้ "เรียบร้อย" เพื่อยืนยันการแก้ไข`;
-                
-                return client.replyMessage(event.replyToken, {
-                    type: 'text',
-                    text: statusText
-                });
+                return client.replyMessage(event.replyToken, { type: 'text', text: statusText });
             }
-            
-            // ⭐️ คำสั่ง help (สำหรับ Admin)
+
+            // ⭐️ คำสั่ง: Help
             if (messageText === 'help' || messageText === 'ช่วยเหลือ') {
                 return client.replyMessage(event.replyToken, {
                     type: 'text',
-                    text: '💡 คำสั่งที่ใช้ได้:\n\n• "รายงาน" - ดูสถานะรายงาน\n• "เรียบร้อย" - ยืนยันการแก้ไขรายงานล่าสุด\n• "เรียบร้อย #1234" - ยืนยันรายงานเฉพาะ\n• "help" - แสดงคำสั่งนี้'
+                    text: '💡 คำสั่ง:\n• "รายงาน" - ดูสถานะ\n• "เรียบร้อย" - ปิดงานล่าสุด\n• "เรียบร้อย #1234" - ปิดงานตามรหัส'
                 });
             }
         }
-        
     } catch (error) {
         console.error('❌ Handle event error:', error);
-        // ⭐️ แจ้งเตือน Admin หากมี error
-        if (process.env.ADMIN_USER_ID) {
-            try {
-                await client.pushMessage(process.env.ADMIN_USER_ID, {
-                    type: 'text',
-                    text: `🚨 Bot Error: ${error.message}`
-                });
-            } catch (pushError) {
-                console.error('❌ Failed to send error to admin:', pushError.message);
-            }
-        }
     }
 }
 
-// ⭐️ API สำหรับรับรายงานจาก LIFF
+// ---------------------------------------------------------
+// 📡 API: รับรายงานจาก LIFF
+// ---------------------------------------------------------
+
 app.post('/api/report', async (req, res) => {
     console.log('📝 API Report received:', req.body);
     
@@ -240,45 +218,38 @@ app.post('/api/report', async (req, res) => {
         const { userId, displayName, pointId } = req.body;
         
         if (!userId || !displayName || !pointId) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Missing required fields' 
-            });
+            return res.status(400).json({ success: false, error: 'Missing required fields' });
         }
         
-        const reportId = Math.floor(1000 + Math.random() * 9000); // สุ่มรหัส 4 หลัก
+        const reportId = Math.floor(1000 + Math.random() * 9000);
         
-        // ⭐️ บันทึกข้อมูลรายงานลง Database
+        // 1. บันทึกข้อมูล (สำคัญที่สุด ต้องทำให้เสร็จก่อน)
         const queryText = `
             INSERT INTO reports (report_id, user_id, display_name, point_id, status)
             VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, created_at
+            RETURNING id
         `;
         const values = [reportId, userId, displayName, pointId, 'pending'];
+        await pool.query(queryText, values);
         
-        const dbResult = await pool.query(queryText, values);
+        console.log(`💾 Saved report #${reportId} to DB`);
         
-        console.log('💾 Saved report to DB:', { 
-            db_id: dbResult.rows[0].id, 
-            reportId, 
-            userId, 
-            pointId 
-        });
-        
-        // ⭐️ ส่งแจ้งเตือนไปยัง Admin
+        // 2. แจ้งเตือน Admin (Fire and Forget - ไม่ต้องรอให้เสร็จก็ได้)
         if (process.env.ADMIN_USER_ID) {
-            try {
-                await client.pushMessage(process.env.ADMIN_USER_ID, {
-                    type: 'text',
-                    text: `🚨 รายงานใหม่!\n👤 คุณ${displayName}\n📍 จุดที่ ${pointId}\n📝 รหัส: #${reportId}\n\nพิมพ์ "เรียบร้อย #${reportId}" เพื่อยืนยัน`
-                });
-                console.log('✅ Sent notification to admin');
-            } catch (pushError) {
-                console.error('❌ Push message error:', pushError.message);
-                // ไม่ต้องหยุดการทำงาน แม้ว่าจะส่งหา Admin ไม่ได้
-            }
+            client.pushMessage(process.env.ADMIN_USER_ID, {
+                type: 'text',
+                text: `🚨 รายงานใหม่!\n👤 คุณ${displayName}\n📍 จุดที่ ${pointId}\n📝 รหัส: #${reportId}\n\nพิมพ์ "เรียบร้อย #${reportId}" เพื่อยืนยัน`
+            }).catch(err => console.error('❌ Admin push failed:', err.message));
         }
-        
+
+        // 3. (Optional) แจ้งลูกค้าว่า "รับเรื่องแล้ว" (ใช้ Retry Logic)
+        // ทำแบบ Async ไม่ต้องรอให้เสร็จถึงจะตอบกลับ LIFF เพื่อความเร็ว
+        sendPushMessageWithRetry(userId, {
+            type: 'text',
+            text: `✅ รับเรื่องจุด ${pointId} แล้วครับ\nเจ้าหน้าที่จะรีบดำเนินการตรวจสอบ 🕒`
+        }).catch(err => console.log('User notification skipped/failed (Normal if not friend)'));
+
+        // ตอบกลับ LIFF ทันที
         res.json({ 
             success: true, 
             reportId,
@@ -287,69 +258,16 @@ app.post('/api/report', async (req, res) => {
         
     } catch (error) {
         console.error('Report API error:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Internal server error',
-            details: error.message
-        });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// ⭐️ Health Check (หน้าหลัก)
-app.get('/', async (req, res) => {
-    try {
-        // ⭐️ ดึงข้อมูลสถานะจาก DB
-        const countQuery = `
-            SELECT
-                COUNT(*) AS total,
-                COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending,
-                COUNT(CASE WHEN status = 'completed' THEN 1 END) AS completed
-            FROM reports
-        `;
-        const countResult = await pool.query(countQuery);
-        const counts = countResult.rows[0];
-
-        res.json({ 
-            status: 'OK', 
-            message: 'Security Report Bot is running',
-            reports: counts,
-            hasChannelToken: !!process.env.CHANNEL_ACCESS_TOKEN,
-            hasAdminUserId: !!process.env.ADMIN_USER_ID,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        res.status(500).json({
-            status: 'ERROR',
-            message: 'Database query failed',
-            error: error.message
-        });
-    }
-});
-
-// ⭐️ Debug endpoint เพื่อดูข้อมูลรายงานทั้งหมด (ควรลบออกใน Production)
-app.get('/debug-reports', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM reports ORDER BY created_at DESC');
-        res.json({
-            total: result.rowCount,
-            reports: result.rows
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ⭐️ ให้ liff-app.html ทำงาน
-app.get('/liff', (req, res) => {
-    res.sendFile(__dirname + '/public/liff-app.html');
-});
-
+// Routes ทั่วไป
+app.get('/', (req, res) => res.send('Security Bot is Running 🚀'));
+app.get('/liff', (req, res) => res.sendFile(__dirname + '/public/liff-app.html'));
 
 // Start Server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log('🚀 Server started on port', PORT);
-    console.log('✅ Webhook is listening at /webhook');
-    console.log('✅ LIFF App is served from /public');
-    console.log('✅ Health Check available at /');
 });
