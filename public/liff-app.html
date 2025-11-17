@@ -1,82 +1,160 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
     <title>Security Report</title>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+
     <style>
+        /* ⭐️ ตั้งค่าพื้นฐานให้ยืดหยุ่น */
+        * {
+            box-sizing: border-box; /* รวม padding/border ในขนาด element */
+        }
+
         body { 
             font-family: 'Prompt', sans-serif; 
             margin: 0; 
-            padding: 20px;
-            background: #f5f5f5;
+            padding: 0;
+            background-color: #f8f9fa;
+            color: #333;
+            
+            /* ⭐️ รองรับ Safe Area (รอยบาก iPhone) */
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
+
         .container { 
-            max-width: 400px; 
-            margin: 0 auto; 
+            width: 100%;
+            max-width: 500px; /* จำกัดความกว้างไม่ให้เกินนี้ใน iPad */
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 24px;
+            margin: 16px;
+            border-radius: 16px; /* มุมโค้งมนสวยงาม */
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 24px;
+            color: #1a1a1a;
+        }
+
+        .card {
+            background: #f1f3f5;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        .label {
+            font-size: 12px;
+            color: #868e96;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .value {
+            font-size: 16px;
+            font-weight: 500;
+            color: #212529;
+        }
+
+        /* ⭐️ ปุ่มใหญ่กดง่าย (Finger-friendly) */
         .report-btn { 
             width: 100%; 
-            padding: 15px; 
-            margin: 20px 0; 
-            background: #06c755; 
+            padding: 16px; 
+            margin-top: 12px; 
+            background: #06c755; /* สีเขียว LINE */
             color: white; 
             border: none; 
-            border-radius: 5px; 
+            border-radius: 12px; 
             font-size: 18px; 
+            font-weight: 600;
             cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+            
+            /* เงาปุ่ม */
+            box-shadow: 0 4px 12px rgba(6, 199, 85, 0.3);
         }
+
+        .report-btn:active {
+            transform: scale(0.98); /* กดยุบลงนิดหน่อย */
+        }
+
         .report-btn:disabled { 
-            background: #cccccc; 
+            background: #adb5bd; 
+            box-shadow: none;
             cursor: not-allowed; 
         }
-        .report-btn:hover:not(:disabled) { background: #05a944; }
-        .status { 
-            padding: 15px; 
-            margin: 15px 0; 
-            border-radius: 5px; 
-            text-align: left;
+
+        /* สถานะต่างๆ */
+        .status-box {
+            margin-top: 20px;
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
             font-size: 14px;
+            line-height: 1.5;
+            animation: fadeIn 0.3s;
         }
-        .success { background: #d4edda; color: #155724; border-left: 4px solid #28a745; }
-        .error { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
-        .loading { background: #fff3cd; color: #856404; border-left: 4px solid #ffc107; }
-        .info { background: #d1ecf1; color: #0c5460; border-left: 4px solid #17a2b8; }
-        .debug-info { 
-            background: #f8f9fa; 
-            color: #495057; 
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-            padding: 10px;
-            margin: 10px 0;
-            font-family: monospace;
-            font-size: 12px;
-            overflow-x: auto;
+        
+        .success { background: #d3f9d8; color: #2b8a3e; border: 1px solid #b2f2bb; }
+        .error { background: #ffe3e3; color: #c92a2a; border: 1px solid #ffc9c9; }
+        .loading { background: #e7f5ff; color: #1864ab; border: 1px solid #d0ebff; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
+
+        /* Debug section (ซ่อนไว้) */
         .toggle-debug {
-            background: none;
-            border: none;
-            color: #0066cc;
-            text-decoration: underline;
-            cursor: pointer;
+            margin-top: 30px;
+            color: #adb5bd;
             font-size: 12px;
-            margin: 5px 0;
+            text-decoration: underline;
+            border: none;
+            background: none;
+            width: 100%;
+            cursor: pointer;
         }
-        .hidden {
+        .debug-info {
+            margin-top: 10px;
+            background: #343a40;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-family: monospace;
+            word-break: break-all;
             display: none;
         }
+        .show { display: block; }
+
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🚨 รายงานจุดตรวจสอบ</h1>
         
-        <div id="pointInfo" class="status info">⏳ กำลังโหลดจุดตรวจสอบ...</div>
-        <div id="userInfo" class="status info">⏳ กำลังระบุตัวตน...</div>
+        <div class="card">
+            <span class="label">📍 จุดที่ตรวจพบ</span>
+            <span id="pointInfo" class="value">⏳ กำลังโหลด...</span>
+        </div>
+
+        <div class="card">
+            <span class="label">👤 ผู้รายงาน</span>
+            <span id="userInfo" class="value">⏳ กำลังระบุตัวตน...</span>
+        </div>
         
         <button class="report-btn" id="reportBtn" onclick="submitReport()" disabled>
             ⏳ กำลังโหลด...
@@ -84,223 +162,119 @@
         
         <div id="status"></div>
         
-        <button class="toggle-debug" onclick="toggleDebug()">
-            🐞 แสดง/ซ่อน ข้อมูล Debug
-        </button>
-        
-        <div id="debugInfo" class="debug-info hidden"></div>
+        <button class="toggle-debug" onclick="toggleDebug()">🐞 แสดง/ซ่อน ข้อมูล Debug</button>
+        <div id="debugInfo" class="debug-info"></div>
     </div>
 
     <script>
+        // --- ส่วน Logic Javascript (เหมือนเดิม แต่ปรับปรุงเล็กน้อย) ---
         let userId = '';
         let displayName = '';
         let pointId = '';
         let isAppReady = false;
-        let debugData = [];
 
-        // Add debug log
-        function addDebugLog(message, data = null) {
-            const timestamp = new Date().toLocaleTimeString();
-            const logEntry = {
-                time: timestamp,
-                message: message,
-                data: data
-            };
-            debugData.push(logEntry);
-            updateDebugDisplay();
-            console.log(`[${timestamp}] ${message}`, data);
-        }
-
-        // Update debug display
-        function updateDebugDisplay() {
+        // ฟังก์ชันช่วยแสดง Debug
+        function logDebug(msg, data = null) {
+            console.log(msg, data);
             const debugDiv = document.getElementById('debugInfo');
-            debugDiv.innerHTML = debugData.map(entry => 
-                `<div><strong>[${entry.time}]</strong> ${entry.message}${
-                    entry.data ? `<br>${JSON.stringify(entry.data, null, 2)}` : ''
-                }</div>`
-            ).join('<hr>');
+            const time = new Date().toLocaleTimeString();
+            let html = `<div>[${time}] ${msg}</div>`;
+            if(data) html += `<div>${JSON.stringify(data)}</div>`;
+            debugDiv.innerHTML += html + '<hr style="border-color:#555; margin:5px 0;">';
         }
 
-        // Toggle debug visibility
         function toggleDebug() {
-            const debugDiv = document.getElementById('debugInfo');
-            debugDiv.classList.toggle('hidden');
+            const el = document.getElementById('debugInfo');
+            el.style.display = el.style.display === 'none' || el.style.display === '' ? 'block' : 'none';
         }
 
-        // Initialize LIFF
         async function initializeLiff() {
-            addDebugLog('🚀 เริ่มต้นโหลด LIFF');
-            
             try {
-                addDebugLog('🔄 กำลัง initialize LIFF...');
-                await liff.init({ liffId: '2008503069-jNvaAdbw' });
-                addDebugLog('✅ LIFF initialize สำเร็จ');
-                
+                // ใส่ LIFF ID ของคุณที่นี่
+                await liff.init({ liffId: '2008503069-jNvaAdbw' }); 
+
                 if (!liff.isLoggedIn()) {
-                    addDebugLog('🔐 ผู้ใช้ยังไม่ได้ login, กำลัง redirect...');
                     liff.login();
                     return;
                 }
+
+                // ดึงข้อมูล Profile
+                const profile = await liff.getProfile();
+                userId = profile.userId;
+                displayName = profile.displayName;
                 
-                addDebugLog('👤 กำลังดึงข้อมูลผู้ใช้...');
-                
-                // ลองดึง profile ก่อน
-                try {
-                    const profile = await liff.getProfile();
-                    userId = profile.userId;
-                    displayName = profile.displayName;
-                    addDebugLog('✅ ได้ข้อมูลจาก getProfile', { 
-                        userId: userId, 
-                        displayName: displayName 
-                    });
-                } catch (profileError) {
-                    addDebugLog('⚠️ ไม่สามารถดึง Profile ได้, ใช้ Context แทน', profileError);
-                    
-                    // ใช้ context แทน
-                    const context = await liff.getContext();
-                    userId = context.userId;
-                    displayName = 'ผู้ใช้ LINE';
-                    
-                    addDebugLog('✅ ใช้ข้อมูลจาก Context', { 
-                        userId: userId, 
-                        displayName: displayName 
-                    });
-                }
-                
-                // ตรวจสอบว่ามี userId
-                if (!userId) {
-                    addDebugLog('❌ ERROR: ไม่มี User ID');
-                    document.getElementById('status').innerHTML = 
-                        `<div class="status error">
-                            <strong>❌ ไม่สามารถระบุตัวตนผู้ใช้ได้</strong><br>
-                            <em>กรุณาปิดแอปแล้วลองใหม่</em>
-                        </div>`;
-                    return;
-                }
-                
-                // Get point ID from URL
+                // ดึงค่า point จาก URL
                 const urlParams = new URLSearchParams(window.location.search);
-                pointId = urlParams.get('point') || 'A1';
-                addDebugLog('📍 ได้รับ Point ID จาก URL', { pointId });
-                
-                // Display info
-                document.getElementById('pointInfo').innerHTML = 
-                    `<strong>📍 จุดที่ตรวจพบ:</strong> ${pointId}`;
-                document.getElementById('userInfo').innerHTML = 
-                    `<strong>👤 ผู้รายงาน:</strong> ${displayName}`;
-                
-                // เปิดให้กดปุ่มได้
+                pointId = urlParams.get('point') || 'ไม่ระบุจุด';
+
+                // แสดงผลบนหน้าจอ
+                document.getElementById('pointInfo').textContent = pointId;
+                document.getElementById('userInfo').textContent = displayName;
+
+                // ปลดล็อคปุ่ม
                 isAppReady = true;
-                document.getElementById('reportBtn').disabled = false;
-                document.getElementById('reportBtn').textContent = '📋 ส่งรายงานจุดนี้';
+                const btn = document.getElementById('reportBtn');
+                btn.disabled = false;
+                btn.textContent = '📋 ส่งรายงานจุดนี้';
                 
-                addDebugLog('🎉 LIFF App พร้อมใช้งาน');
-                
-            } catch (error) {
-                addDebugLog('❌ LIFF Error', error);
+                logDebug('Ready', { userId, pointId });
+
+            } catch (err) {
                 document.getElementById('status').innerHTML = 
-                    `<div class="status error">
-                        <strong>❌ เกิดข้อผิดพลาดในการโหลดแอป</strong><br>
-                        <strong>Error:</strong> ${error.message}<br>
-                        <em>กรุณาปิดแอปแล้วลองใหม่</em>
-                    </div>`;
+                    `<div class="status-box error">❌ เกิดข้อผิดพลาด: ${err.message}</div>`;
+                logDebug('Init Error', err);
             }
         }
 
-        // Submit report
         async function submitReport() {
-            // ตรวจสอบว่าพร้อมหรือยัง
-            if (!isAppReady) {
-                addDebugLog('⚠️ App ยังไม่พร้อม, ไม่สามารถส่งรายงานได้');
-                document.getElementById('status').innerHTML = 
-                    '<div class="status error">⏳ กำลังโหลดข้อมูล... กรุณารอสักครู่</div>';
-                return;
-            }
-            
-            // ตรวจสอบว่ามีข้อมูลครบ
-            if (!userId || !displayName || !pointId) {
-                addDebugLog('❌ ข้อมูลไม่ครบ', { userId, displayName, pointId });
-                document.getElementById('status').innerHTML = 
-                    '<div class="status error">❌ ข้อมูลไม่ครบถ้วน กรุณาลองใหม่</div>';
-                return;
-            }
+            if (!isAppReady) return;
 
-            const reportBtn = document.getElementById('reportBtn');
-            reportBtn.disabled = true;
-            reportBtn.textContent = '⏳ กำลังส่ง...';
+            const btn = document.getElementById('reportBtn');
+            const statusDiv = document.getElementById('status');
             
-            addDebugLog('📤 เริ่มส่งรายงาน...');
-            
+            // ล็อคปุ่มขณะส่ง
+            btn.disabled = true;
+            btn.textContent = '⏳ กำลังส่งข้อมูล...';
+            statusDiv.innerHTML = '';
+
             try {
-                document.getElementById('status').innerHTML = 
-                    '<div class="status loading"><strong>⏳ กำลังส่งรายงาน...</strong><br>กรุณารอสักครู่</div>';
-
-                const requestData = {
-                    userId: userId,
-                    displayName: displayName,
-                    pointId: pointId
-                };
-
-                addDebugLog('📝 ข้อมูลที่จะส่ง', requestData);
-
-                const startTime = Date.now();
                 const response = await fetch('/api/report', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestData)
-                });
-                const responseTime = Date.now() - startTime;
-
-                addDebugLog(`⏱️ ได้รับ response ใน ${responseTime}ms`, {
-                    status: response.status,
-                    statusText: response.statusText,
-                    ok: response.ok
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, displayName, pointId })
                 });
 
                 const result = await response.json();
-                addDebugLog('📨 Response data', result);
 
                 if (result.success) {
-                    addDebugLog('✅ ส่งรายงานสำเร็จ', { reportId: result.reportId });
-                    document.getElementById('status').innerHTML = 
-                        `<div class="status success">
+                    statusDiv.innerHTML = `
+                        <div class="status-box success">
                             <strong>✅ ส่งรายงานสำเร็จ!</strong><br>
-                            <strong>รหัสรายงาน:</strong> #${result.reportId}<br>
-                            <strong>จุดที่รายงาน:</strong> ${pointId}<br>
-                            <strong>เวลา:</strong> ${new Date().toLocaleTimeString('th-TH')}<br>
-                            <em>คุณจะได้รับแจ้งเตือนเมื่อจัดการเสร็จเรียบร้อย</em>
+                            รหัสรายงาน: #${result.reportId}<br>
+                            ขอบคุณที่แจ้งให้เราทราบครับ
                         </div>`;
+                    btn.textContent = '✅ เรียบร้อย';
+                    
+                    // ปิดหน้า LIFF อัตโนมัติหลังจาก 3 วินาที (Optional)
+                    // setTimeout(() => liff.closeWindow(), 3000);
+                    
                 } else {
-                    addDebugLog('❌ API returned error', result);
-                    let errorHtml = `<div class="status error">
-                        <strong>❌ การส่งรายงานล้มเหลว</strong><br>`;
-                    
-                    if (result.error) errorHtml += `<strong>Error:</strong> ${result.error}<br>`;
-                    if (result.details) errorHtml += `<strong>Details:</strong> ${result.details}<br>`;
-                    
-                    errorHtml += `<em>กรุณาลองใหม่อีกครั้งหรือติดต่อผู้ดูแลระบบ</em></div>`;
-                    
-                    document.getElementById('status').innerHTML = errorHtml;
+                    throw new Error(result.error || 'Unknown error');
                 }
-                
-            } catch (error) {
-                addDebugLog('💥 Fetch error', error);
-                document.getElementById('status').innerHTML = 
-                    `<div class="status error">
-                        <strong>❌ การเชื่อมต่อล้มเหลว</strong><br>
-                        <strong>Error:</strong> ${error.message}<br>
-                        <em>กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตและลองใหม่</em>
+
+            } catch (err) {
+                statusDiv.innerHTML = `
+                    <div class="status-box error">
+                        <strong>❌ ส่งไม่สำเร็จ</strong><br>
+                        ${err.message}<br>
+                        กรุณาลองใหม่อีกครั้ง
                     </div>`;
-            } finally {
-                reportBtn.disabled = false;
-                reportBtn.textContent = '📋 ส่งรายงานจุดนี้';
+                btn.disabled = false;
+                btn.textContent = '📋 ลองส่งใหม่';
             }
         }
 
-        // Start the app when page loads
-        addDebugLog('📄 หน้าเว็บโหลดเรียบร้อย, เริ่มต้น LIFF...');
+        // เริ่มทำงาน
         initializeLiff();
     </script>
 </body>
